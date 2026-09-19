@@ -57,9 +57,11 @@ export default function App() {
     </div>
   );
 }`,
-            "/components/Header.js": `import React from 'react';
+            "/components/Header.js": `import React, { useState } from 'react';
 
 export default function Header() {
+  const [started, setStarted] = useState(false);
+
   return (
     <header className='sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-100'>
       <div className='max-w-7xl mx-auto px-6 h-16 flex items-center justify-between'>
@@ -76,8 +78,8 @@ export default function Header() {
         </nav>
         <div className='flex items-center gap-4'>
           <button className='text-sm font-medium text-zinc-700 hover:text-zinc-900 transition hidden sm:block'>Sign in</button>
-          <button className='px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow-sm transition cursor-pointer'>
-            Get Started
+          <button onClick={() => setStarted(prev => !prev)} className='px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow-sm transition cursor-pointer'>
+            {started ? 'Get Started Now' : 'Get Started'}
           </button>
         </div>
       </div>
@@ -254,7 +256,44 @@ api.defaults.adapter = async (config) => {
     const getProjects = () => {
         try {
             const saved = localStorage.getItem("mock_projects");
-            return saved ? JSON.parse(saved) : initialProjects;
+        const projects = saved ? JSON.parse(saved) : initialProjects;
+        let changed = false;
+
+        const migratedProjects = projects.map((project) => {
+          const headerPath = "/components/Header.js";
+          const header = project.files?.[headerPath];
+          if (typeof header !== "string" || !header.includes("Get Started")) {
+            return project;
+          }
+
+          let migratedHeader = header
+            .replace(/(  const \[started, setStarted\] = useState\(false\);\n\s*){2,}/g, "  const [started, setStarted] = useState(false);\n")
+            .replace(/setStarted\(true\)/g, "setStarted(prev => !prev)");
+
+          if (!migratedHeader.includes("useState")) {
+            migratedHeader = migratedHeader.replace("import React from 'react';", "import React, { useState } from 'react';");
+          }
+          if (!migratedHeader.includes("const [started, setStarted]")) {
+            migratedHeader = migratedHeader.replace("export default function Header() {", "export default function Header() {\n  const [started, setStarted] = useState(false);");
+          }
+          migratedHeader = migratedHeader.replace(/<button([^>]*)>\s*Get Started\s*<\/button>/, "<button onClick={() => setStarted(prev => !prev)}$1>{started ? 'Get Started Now' : 'Get Started'}</button>");
+
+          if (migratedHeader === header) {
+            return project;
+          }
+          changed = true;
+
+          return {
+            ...project,
+            files: {
+              ...project.files,
+                [headerPath]: migratedHeader,
+            },
+          };
+        });
+
+        if (changed) saveProjects(migratedProjects);
+        return migratedProjects;
         } catch {
             return initialProjects;
         }
@@ -339,7 +378,7 @@ api.defaults.adapter = async (config) => {
             ],
             files: {
                 "/App.js": `import React from 'react';\nimport Header from './components/Header';\nimport Hero from './components/Hero';\nimport Footer from './components/Footer';\nimport './styles.css';\n\nexport default function App() {\n  return (\n    <div className='min-h-screen bg-white text-zinc-900 font-sans'>\n      <Header />\n      <Hero />\n      <Footer />\n    </div>\n  );\n}`,
-                "/components/Header.js": `import React from 'react';\n\nexport default function Header() {\n  return (\n    <header className='px-6 py-4 border-b border-zinc-100 flex justify-between items-center max-w-7xl mx-auto'>\n      <span className='font-bold text-xl tracking-tight text-zinc-900'>${projName}</span>\n      <button className='px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow-xs transition'>Get Started</button>\n    </header>\n  );\n}`,
+                "/components/Header.js": `import React, { useState } from 'react';\n\nexport default function Header() {\n  const [started, setStarted] = useState(false);\n\n  return (\n    <header className='px-6 py-4 border-b border-zinc-100 flex justify-between items-center max-w-7xl mx-auto'>\n      <span className='font-bold text-xl tracking-tight text-zinc-900'>${projName}</span>\n      <button onClick={() => setStarted(prev => !prev)} className='px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow-xs transition'>{started ? 'Get Started Now' : 'Get Started'}</button>\n    </header>\n  );\n}`,
                 "/components/Hero.js": `import React from 'react';\n\nexport default function Hero() {\n  return (\n    <section className='py-20 max-w-7xl mx-auto px-6 text-center'>\n      <h1 className='text-5xl font-bold tracking-tight text-zinc-950 mb-6'>${prompt}</h1>\n      <p className='text-zinc-600 text-lg max-w-2xl mx-auto mb-8'>Welcome to your new custom application generated with AI.</p>\n      <button className='px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl text-base shadow-md transition'>Explore Features</button>\n    </section>\n  );\n}`,
                 "/components/Footer.js": `import React from 'react';\n\nexport default function Footer() {\n  return (\n    <footer className='py-8 max-w-7xl mx-auto px-6 text-center text-sm text-zinc-400 border-t border-zinc-100'>\n      © ${new Date().getFullYear()} ${projName}. All rights reserved.\n    </footer>\n  );\n}`,
                 "/styles.css": `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');\nbody { font-family: 'Inter', sans-serif; }`,
