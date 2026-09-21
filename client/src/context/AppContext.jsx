@@ -211,7 +211,7 @@ export function AppContentProvider({children}) {
 
        useEffect(()=>{
          return ()=> {
-            debounceSave.cancel();
+            debounceSave.flush();
          }
        }, [debounceSave])
 
@@ -245,7 +245,8 @@ export function AppContentProvider({children}) {
             handleDelete,
             handleChat,
             logout,
-            updateProjectFiles
+            updateProjectFiles,
+            handleChat
         }}>
 
             {children}
