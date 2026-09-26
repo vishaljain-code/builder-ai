@@ -98,7 +98,7 @@ export function AppContentProvider({children}) {
         }
     }
 
-    const loadProject = async (id, silent = false)=> {
+    const loadProject = useCallback(async (id, silent = false)=> {
         if(!user) return;
         if(!silent) setLoadingActiveProject(true)
             try {
@@ -116,14 +116,17 @@ export function AppContentProvider({children}) {
                 }
             } catch (err) {
                 console.log("Failed to load project:", err);
+                if(err?.response?.status === 404) {
+                    setActiveProjects(null);
+                }
                 if(!silent) {
-                    toast.error("Failed to load project details");
+                    toast.error(err?.response?.status === 404 ? "Project not found" : "Failed to load project details");
                     navigate("/");
                 }
             } finally {
                 if(!silent) setLoadingActiveProject(false)
             }
-    }
+    }, [navigate, user])
       
        // Automatically poll active project status if generating or pending
        useEffect(()=>{

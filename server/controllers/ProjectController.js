@@ -41,7 +41,7 @@ export async function createProject(req,res) {
 
         // Start background generation
         runBackgroundGeneration(project._id.toString(), prompt).catch((err)=>{
-            console.error(`[Background AI] fatal generation error for project {project._id}:`, err)
+         console.error(`[Background AI] fatal generation error for project ${project._id}:`, err)
 
         })
 
@@ -130,14 +130,14 @@ async function runBackgroundGeneration(projectId, prompt) {
             await project.save();
          }
       }  catch (error) {
-         console.error(`[Background AI] Fatal generation error for project ${projectId}:`, err);
+         console.error(`[Background AI] Fatal generation error for project ${projectId}:`, error);
          await Project.findByIdAndUpdate(projectId, {
             status: "failed",
-            error: err.message,
+            error: error.message,
             $push: {
                messages:{
                   role: "assistant",
-                  content: `❌ Generation failed: ${err.message}`,
+                  content: `Generation failed: ${error.message}`,
                      timestamp:new Date()
                }
             }
@@ -169,7 +169,7 @@ export async function getProject(req, res) {
         return;
      }
 
-     const project = await Project.findOne({_id: req.params.id, owner: req.userId})
+       const project = await Project.findOne({_id: req.params.id, owner: req.user.userId})
 
      if(!project) {
         res.status(404).json( { error: "Project not found"});
@@ -185,7 +185,7 @@ export async function getProject(req, res) {
             _id: project._id,
             name: project.name, 
             description: project.description,
-            files: {},
+            files: filesObj,
             messages: project.messages,
             version: project.version,
             status: project.status,
@@ -248,9 +248,7 @@ export async function updateProjectFiles(req, res) {
 
        const filesObj = {};
         for(const [path, entry] of Object.entries(project.files)) {
-          if(typeof content === "string") {
             filesObj[path] = entry.content;
-          }
        }
 
        res.json({
@@ -310,7 +308,7 @@ export async function getPublicProject(req, res) {
             _id: project._id,
             name: project.name, 
             description: project.description,
-            files: {},
+              files: filesObj,
             version: project.version,
        })
        }
