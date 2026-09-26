@@ -2,9 +2,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import pMap from "p-map";
 import { FileCodeSchema, FilePlanSchema, RevisionResultSchema } from "./aiSchemas.js";
-import { buildFileCodeSystem, FILE_PLAN_SYSTEM } from './prompts.js';
+import { buildFileCodeSystem, FILE_PLAN_SYSTEM, REVISE_SYSTEM } from './prompts.js';
 import { el } from 'zod/v4/locales';
 import { normalizeContent } from './contentNormalizer.js';
+import { validateAndFixCode, validateRevisionContent } from './codeValidator.js';
 
 // --- OpenRouter Model Client Setup ---
 const MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
@@ -118,7 +119,7 @@ export async function generateProject(prompt, callbacks) {
                     }
                     return {success: true, file, result: singleResult }
                 } catch (error) {
-                    return { success: false, file, error:err };
+                    return { success: false, file, error };
                 }
             },
             {concurrency: MAX_CONCURRENCY},
@@ -128,7 +129,7 @@ export async function generateProject(prompt, callbacks) {
         for(const entry of results) {
             if(entry.success) {
                 const { path, code } = entry.result;
-                files[path.startWith("/") ? path: "/" + path] = code;
+                files[path.startsWith("/") ? path : "/" + path] = code;
             }
             else {
                 console.warn(`[AI] File ${entry.file.path} failed in round ${round}: ${entry.error?.message || entry.error}`);
@@ -144,20 +145,22 @@ export async function generateProject(prompt, callbacks) {
         console.error(`[AI] failed tp generate ${pendingFiles.length}
         files after all retry rounds: ${failedPaths}`);
 
-        if (pendingFiles.some((f) => f.path === "/App.js")) {
+        for (const file of pendingFiles) {
             const ext = file.path.split(".").pop()?.toLowerCase();
 
-            if(ext === "css") {
-                files[file.path] = `/* ${file.description} - Generation
-                failed, please retry */\n` 
+            if (ext === "css") {
+                files[file.path] = `/* ${file.description} - Generation failed, please retry */\n`;
             } else {
-                files[file.path] = "import React from 'react';\n\n" + `// ⚠️ This file could not be generated. Please retry. \n` + `// Purpose: ${file.description}\n\n` + "export default function Placeholder() {\n" + 
-                "return (\n" + 
-                "     <div className='p-8 text-center text-zinc-400'>\n" + 
-                "     <P> ⚠️ Component failed to generate, Please try again.</p>\n" + 
-                " </div>\n" + 
-                "  );\n" + 
-                "}\n";
+                files[file.path] = "import React from 'react';\n\n" +
+                    `// This file could not be generated. Please retry.\n` +
+                    `// Purpose: ${file.description}\n\n` +
+                    "export default function Placeholder() {\n" +
+                    "  return (\n" +
+                    "    <div className='p-8 text-center text-zinc-400'>\n" +
+                    "      <p>Component failed to generate. Please try again.</p>\n" +
+                    "    </div>\n" +
+                    "  );\n" +
+                    "}\n";
             }
         }
     }
@@ -211,11 +214,11 @@ const { object: rawParsed } = await generateObject({
 
         let opstr = String(op.op || "").trim().toLowerCase();
 
-        if(["create", "add", "new"].includes(opStr)) op.op = "create";
+        if(["create", "add", "new"].includes(opstr)) op.op = "create";
         else if(["update", "edit", "modify", "patch"].includes
-        (opStr)) op.op = "update"; 
+        (opstr)) op.op = "update"; 
         else if (["delete", "remove", "del", "rm"].includes
-        (opStr)) op.op = "delete";
+        (opstr)) op.op = "delete";
 
         if(op.path && typeof op.path === "string" && !op.path.startsWith("/")) {
             op.path = "/" + op.path;
