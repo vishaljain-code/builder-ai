@@ -231,7 +231,7 @@ export async function updateProjectFiles(req, res) {
        const project = await Project.findOne({_id: req.params.id, owner: req.user.userId})
 
        if(!project) {
-        req.status(404).json({ error: "Project not found" });
+        res.status(404).json({ error: "Project not found" });
         return;
        }
 

@@ -8,7 +8,11 @@ import { normalizeContent } from './contentNormalizer.js';
 import { validateAndFixCode, validateRevisionContent } from './codeValidator.js';
 
 // --- OpenRouter Model Client Setup ---
-const MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+const configuredModel = process.env.OPENROUTER_MODEL?.trim();
+const obsoleteModels = new Set(["cohere/north-mini-code:free"]);
+const MODEL = configuredModel && !obsoleteModels.has(configuredModel)
+    ? configuredModel
+    : "openrouter/free";
 const MAX_CONCURRENCY = parseInt(process.env.AI_MAX_CONCURRENCY || "6", 10);
 
 const openRouter = createOpenAI({
