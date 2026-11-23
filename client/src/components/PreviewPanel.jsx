@@ -8,7 +8,7 @@ import SandpackErrorMonitor from './SandpackErrorMonitor';
 function SandpackFileWatcher({ onLiveFilesChange }) {
     const { sandpack } = useSandpack();
     const { files} = sandpack;
-    const {activeProject, updateProjectFiles} = useAppContext() 
+    const {activeProjects: activeProject, updateProjectFiles} = useAppContext()
 
     const activeProjectRef = useRef(activeProject)
 

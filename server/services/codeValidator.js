@@ -4,6 +4,17 @@
 // Void HTML elements that must be self-closed in JSX
 const VOID_ELEMENTS = ["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"];
 
+function fixMalformedJsxComments(code, filePath, warnings) {
+    const malformedCommentRegex = /\{\/\*([^\r\n]*?)(?:-->\*\*|-->\})/g;
+    const fixedCode = code.replace(malformedCommentRegex, "{/*$1*/}");
+
+    if (fixedCode !== code) {
+        warnings.push(`${filePath}: Fixed malformed JSX comment`);
+    }
+
+    return fixedCode;
+}
+
 // Validate and auto-fix common AI-generated code issues
 export function validateAndFixCode(code, filePath, context) {
     const warnings = [];
@@ -32,6 +43,7 @@ export function validateAndFixCode(code, filePath, context) {
     }
 
     // --- JS/JSX-specific fixes ---
+    code = fixMalformedJsxComments(code, filePath, warnings);
 
     // 2. Fix `class=` → `className=` in JSX (but not inside strings or comments)
     // Match class= that appears inside JSX tags (after < and before >)
@@ -155,6 +167,8 @@ export function validateRevisionContent(content, filePath, op) {
             warnings.push(`${filePath}: Self-closed <${tag}> in replacement`);
         }
     }
+
+    content = fixMalformedJsxComments(content, filePath, warnings);
 
     return { content, warnings };
 }
